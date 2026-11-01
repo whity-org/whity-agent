@@ -153,6 +153,31 @@ impl Connections {
         Ok(view(&connection, persisted))
     }
 
+    /// A copy of the saved state, for listing tools and their links.
+    pub fn state(&self) -> State {
+        self.state.lock().unwrap().clone()
+    }
+
+    /// Change the saved state and write it, under the lock (no awaiting inside).
+    pub fn update_state<R>(&self, change: impl FnOnce(&mut State) -> R) -> Result<R, String> {
+        let mut state = self.state.lock().unwrap();
+        let result = change(&mut state);
+        self.file.save(&state)?;
+        Ok(result)
+    }
+
+    /// The host and MCP URL of a signed-in workspace. Tools name the server
+    /// after the host, which, unlike the workspace's own name, is unique.
+    pub fn workspace(&self, id: &str) -> Option<(String, String)> {
+        self.list().into_iter().find(|c| c.id == id).map(|c| {
+            let host = url::Url::parse(&c.resource)
+                .ok()
+                .and_then(|u| u.host_str().map(str::to_string))
+                .unwrap_or_default();
+            (host, c.resource)
+        })
+    }
+
     pub fn sign_out(&self, id: &str) -> Result<(), String> {
         self.access.lock().unwrap().remove(id);
         self.session_only.lock().unwrap().retain(|c| c.id != id);

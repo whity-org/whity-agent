@@ -28,7 +28,7 @@ pub struct Connection {
     pub client_id: String,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct State {
     #[serde(default)]
     pub connections: Vec<Connection>,
@@ -36,6 +36,25 @@ pub struct State {
     /// server, by issuer, so it registers once rather than on every sign-in.
     #[serde(default)]
     pub clients: BTreeMap<String, String>,
+    /// The tools whity-agent connected, and how, so it touches only what it
+    /// added and can take it out or put a backup back (WHIT-823).
+    #[serde(default)]
+    pub links: Vec<Link>,
+}
+
+/// One tool connected to one workspace. No secrets: names, paths and hashes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Link {
+    pub tool: String,
+    pub connection: String,
+    /// The server name in the tool's config, e.g. `whity-example-bakery`.
+    pub server: String,
+    /// The config file changed, for a file edit.
+    pub path: Option<String>,
+    /// The copy of that file from before the edit.
+    pub backup: Option<String>,
+    /// The hash of what whity-agent wrote, so a restore never overwrites a later edit.
+    pub written_hash: Option<String>,
 }
 
 /// A stable id per workspace resource, so signing in again replaces the old

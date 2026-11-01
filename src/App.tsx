@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react"
 import { listConnections, signIn, signOut, type Connection, type SignInError } from "./api"
 import { Button } from "./components/button"
 import { useI18n, type MessageKey } from "./i18n"
+import { ToolsPanel } from "./tools-panel"
 
 const ERROR_KEYS: Record<SignInError, MessageKey> = {
   invalid_address: "errors.invalidAddress",
@@ -111,6 +112,8 @@ export function App() {
           </Button>
         </div>
       </form>
+
+      <ToolsPanel connections={connections} />
     </main>
   )
 }
