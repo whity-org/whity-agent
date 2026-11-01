@@ -231,10 +231,11 @@ pub struct Environment {
 
 impl Environment {
     pub fn current() -> Self {
+        let home =
+            std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
         Self {
             os: std::env::consts::OS,
-            home: std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-                .map(PathBuf::from),
+            home,
             appdata: std::env::var_os("APPDATA").map(PathBuf::from),
             path: std::env::var_os("PATH")
                 .map(|p| std::env::split_paths(&p).collect())
@@ -303,6 +304,33 @@ impl Environment {
     }
 }
 
+/// A PATH with the usual places for these tools added. An app opened from the
+/// Dock or a desktop launcher doesn't get the PATH a terminal has, so on macOS
+/// and Linux it would miss them. Version managers that only a shell sets up,
+/// like nvm, are still missed.
+pub fn with_usual_dirs(path: Vec<PathBuf>, home: Option<&Path>) -> Vec<PathBuf> {
+    let mut dirs = path;
+    let usual = home
+        .into_iter()
+        .flat_map(|h| {
+            [
+                h.join(".local/bin"),
+                h.join(".npm-global/bin"),
+                h.join(".bun/bin"),
+            ]
+        })
+        .chain([
+            PathBuf::from("/opt/homebrew/bin"),
+            PathBuf::from("/usr/local/bin"),
+        ]);
+    for dir in usual {
+        if !dirs.contains(&dir) {
+            dirs.push(dir);
+        }
+    }
+    dirs
+}
+
 /// Keep a tool's command from opening a console window: the app has none of its
 /// own on Windows, so each one would flash a new one up.
 pub fn no_console(command: &mut tokio::process::Command) {
@@ -323,6 +351,26 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn usual_folders_are_added_once() {
+        let home = Path::new("/home/rana");
+        let dirs = with_usual_dirs(
+            vec![PathBuf::from("/usr/bin"), PathBuf::from("/usr/local/bin")],
+            Some(home),
+        );
+
+        assert_eq!(
+            dirs[0],
+            PathBuf::from("/usr/bin"),
+            "what was there comes first"
+        );
+        assert!(dirs.contains(&home.join(".local/bin")));
+        assert_eq!(
+            dirs.iter().filter(|d| d.ends_with("usr/local/bin")).count(),
+            1
+        );
     }
 
     #[test]

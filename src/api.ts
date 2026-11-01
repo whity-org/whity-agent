@@ -86,3 +86,7 @@ export const signInAgent = (connection: string, slug: string) => invoke<Connecti
 
 /** How a sign-in is named on screen: the workspace, or the agent in it. */
 export const connectionName = (connection: Connection) => connection.name ?? new URL(connection.resource).host
+
+/** Downloads a newer version if there is one, and answers its version when it's ready. */
+export const checkForUpdate = () => invoke<string | null>("check_for_update")
+export const installUpdate = () => invoke<void>("install_update")

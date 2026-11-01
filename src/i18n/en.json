@@ -59,5 +59,8 @@
   "connections.grantedAgents": "Agents you've granted in {workspace}",
   "connections.useAgent": "Sign in as this agent",
   "tools.connectAs": "Connect as",
-  "chat.asAgent": "{agent} (agent)"
+  "chat.asAgent": "{agent} (agent)",
+  "update.ready": "An update is ready:",
+  "update.restart": "Restart to update",
+  "update.failed": "It couldn't be installed. It will try again later."
 }

@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@whity/ui/tabs"
 import { ChatPanel } from "./chat-panel"
 import { useI18n, type MessageKey } from "./i18n"
 import { ToolsPanel } from "./tools-panel"
+import { UpdateBanner } from "./update-banner"
 
 const ERROR_KEYS: Record<SignInError, MessageKey> = {
   invalid_address: "errors.invalidAddress",
@@ -72,6 +73,8 @@ export function App() {
         <h1 className="text-lg font-semibold">{t("app.title")}</h1>
         <Button variant="outline" onClick={toggle}>{t("app.language")}</Button>
       </header>
+
+      <UpdateBanner />
 
       <Tabs defaultValue="connections" className="flex min-h-0 flex-1 flex-col gap-4">
         <TabsList>

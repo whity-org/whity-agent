@@ -1,0 +1,159 @@
+name: Release
+
+# Builds every installer into a DRAFT release, signs updates with minisign and
+# publishes SHA-256 checksums. A person reviews the draft and publishes it; only
+# then does latest.json reach installed apps.
+#
+# Run it by pushing a tag (vX.Y.Z), or by hand from the Actions tab to try the
+# builds. OS code signing is off for now (decision Q5, see docs/INSTALL.md). The
+# steps are ready: set the repository variables WINDOWS_SIGNING and MACOS_SIGNING
+# to "true", with the secrets those steps name, to turn either on.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+
+env:
+  TAG: ${{ github.ref_type == 'tag' && github.ref_name || format('v0.0.0-try.{0}', github.run_number) }}
+  # Merged over tauri.conf.json by the Tauri CLI, so a local build needs no key.
+  TAURI_CONFIG: '{"bundle":{"createUpdaterArtifacts":true}}'
+
+jobs:
+  check:
+    name: Checks
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ env.TAG }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag matches the version
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          [ "$TAG" = "v$version" ] || { echo "tag $TAG is not v$version"; exit 1; }
+      - name: The updater key is in place
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          [ -s src-tauri/updater.pub ] || { echo "src-tauri/updater.pub is empty"; exit 1; }
+          [ -n "$KEY" ] || { echo "TAURI_SIGNING_PRIVATE_KEY is not set"; exit 1; }
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: --target x86_64-pc-windows-msvc
+          - name: Windows arm64
+            os: windows-latest
+            target: aarch64-pc-windows-msvc
+            args: --target aarch64-pc-windows-msvc
+          - name: macOS universal
+            os: macos-latest
+            target: x86_64-apple-darwin,aarch64-apple-darwin
+            args: --target universal-apple-darwin
+          - name: Linux x64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            args: --target x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev patchelf
+      - name: Rust targets
+        shell: bash
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup target add ${TARGETS//,/ }
+        env:
+          TARGETS: ${{ matrix.target }}
+        working-directory: src-tauri
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+
+      # Off until the owner turns OS signing on (decision Q5).
+      - name: Prepare Azure Trusted Signing
+        if: runner.os == 'Windows' && vars.WINDOWS_SIGNING == 'true'
+        shell: bash
+        env:
+          AZURE_SIGN_ARGS: ${{ secrets.AZURE_SIGN_ARGS }}
+        run: |
+          dotnet tool install --global AzureSignTool
+          echo "TAURI_CONFIG={\"bundle\":{\"createUpdaterArtifacts\":true,\"windows\":{\"signCommand\":\"AzureSignTool sign $AZURE_SIGN_ARGS %1\"}}}" >> "$GITHUB_ENV"
+      - name: Import the Apple certificate
+        if: runner.os == 'macOS' && vars.MACOS_SIGNING == 'true'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      - name: Use the Apple identity for signing and notarising
+        if: runner.os == 'macOS' && vars.MACOS_SIGNING == 'true'
+        env:
+          IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          ID: ${{ secrets.APPLE_ID }}
+          PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          {
+            echo "APPLE_SIGNING_IDENTITY=$IDENTITY"
+            echo "APPLE_ID=$ID"
+            echo "APPLE_PASSWORD=$PASSWORD"
+            echo "APPLE_TEAM_ID=$TEAM"
+          } >> "$GITHUB_ENV"
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ needs.check.outputs.tag }}
+          releaseName: Whity Agent ${{ needs.check.outputs.tag }}
+          releaseBody: |
+            Installing for the first time? Read the [install notes, in English and Arabic](https://github.com/whity-org/whity-agent/blob/main/docs/INSTALL.md). Your computer may warn you, because these builds aren't signed with a paid certificate yet. `SHA256SUMS.txt` lists every file's checksum.
+
+            [ملاحظات التثبيت بالعربية والإنجليزية](https://github.com/whity-org/whity-agent/blob/main/docs/INSTALL.md).
+          releaseDraft: true
+          prerelease: ${{ github.ref_type != 'tag' }}
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}
+
+  checksums:
+    name: Checksums
+    needs: [check, build]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Publish SHA-256 checksums with the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.check.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          mkdir assets && cd assets
+          gh release download "$TAG" -R "$REPO"
+          rm -f SHA256SUMS.txt
+          sha256sum -- * > ../SHA256SUMS.txt
+          cat ../SHA256SUMS.txt
+          gh release upload "$TAG" ../SHA256SUMS.txt -R "$REPO" --clobber

@@ -17,7 +17,7 @@ Design: [Agent personas, presets and whity-agent](https://github.com/whity-org/w
 
 - **Act as one of your agents.** Agents you've granted appear under their workspace. Signing in as one adds a connection to `/mcp/agents/<slug>`, which the chat and the tools can use in place of you. The server enforces that agent's grant.
 
-Next: signed updates (WHIT-824).
+- **Installers and signed updates.** See [install notes, in English and Arabic](docs/INSTALL.md). OS code signing is off for now; updates are always minisign-signed against the key in `src-tauri/updater.pub`. Releases are built as drafts by `.github/workflows/release.yml` and a person publishes them.
 
 ## Develop
 
