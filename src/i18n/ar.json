@@ -1,0 +1,20 @@
+{
+  "app.title": "وكيل Whity",
+  "app.language": "English",
+  "connections.title": "مساحات العمل",
+  "connections.intro": "اربط مساحة عمل في Whity، فتصل إليها أدوات الذكاء الاصطناعي لديك عبر هذا التطبيق، بصلاحياتك أنت.",
+  "connections.empty": "لم تُربط أي مساحة عمل بعد.",
+  "connections.address": "عنوان مساحة العمل",
+  "connections.signIn": "تسجيل الدخول",
+  "connections.signingIn": "أكمل تسجيل الدخول في المتصفح…",
+  "connections.signOut": "تسجيل الخروج",
+  "connections.via": "عبر {issuer}",
+  "connections.kept": "محفوظ في سلسلة مفاتيح جهازك",
+  "connections.sessionOnly": "حتى تغلق التطبيق",
+  "errors.invalidAddress": "أدخل عنوان مساحة العمل، مثل app.whity.dev.",
+  "errors.noSignIn": "مساحة العمل هذه لا تتيح تسجيل دخول التطبيقات بعد.",
+  "errors.signInFailed": "لم يكتمل تسجيل الدخول: {reason}",
+  "errors.cancelled": "أُلغي تسجيل الدخول في المتصفح.",
+  "errors.timedOut": "استغرق تسجيل الدخول وقتًا طويلًا. حاول مرة أخرى.",
+  "errors.keychain": "سلسلة مفاتيح جهازك غير متاحة، لذا يستمر تسجيل الدخول هذا حتى تغلق التطبيق."
+}

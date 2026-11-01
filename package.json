@@ -1,0 +1,33 @@
+{
+  "name": "whity-agent",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Whity's desktop companion: connects your local AI tools to your Whity workspace over MCP, and lets you chat with Whity.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "tauri": "tauri",
+    "tokens:sync": "node scripts/sync-tokens.mjs",
+    "changelog:check": "node scripts/changelog-check.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.12.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@tauri-apps/cli": "^2.12.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.0",
+    "typescript": "~5.8.3",
+    "vite": "^8.3.5",
+    "vitest": "^4.0.0"
+  }
+}
