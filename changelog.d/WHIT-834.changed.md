@@ -1,0 +1,1 @@
+- **Whity's tokens, fonts and Button now come from npm.** whity-agent uses `@whity/tokens` and `@whity/ui` instead of a vendored copy and a local Button, so it stays in step with the web app (WHIT-834).

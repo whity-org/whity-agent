@@ -1,12 +1,13 @@
 @import "tailwindcss";
 
-/* Whity's design tokens, fonts and base layer, vendored from whity-core's
-   @whity-org/tokens (see src/vendor/whity-tokens/VERSION and
-   scripts/sync-tokens.mjs). Never use raw colours or Tailwind palette
-   classes: only these tokens. */
-@import "./vendor/whity-tokens/generated/theme.css";
-@import "./vendor/whity-tokens/generated/base.css";
-@import "./vendor/whity-tokens/generated/fonts.css";
+/* Whity's design tokens, fonts and base layer. Never use raw colours or
+   Tailwind palette classes: only these tokens. */
+@import "@whity/tokens/css";
+@import "@whity/tokens/base.css";
+@import "@whity/tokens/fonts.css";
+
+/* @whity/ui ships its source, so Tailwind has to read its classes there. */
+@source "../node_modules/@whity/ui/src";
 
 html,
 body,

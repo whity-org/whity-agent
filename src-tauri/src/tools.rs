@@ -1,7 +1,7 @@
 //! The AI tools whity-agent can connect, and finding them on this computer
 //! (WHIT-823).
 //!
-//! The table mirrors `local` in whity-core's `@whity-org/features/mcp`
+//! The table mirrors `local` in whity-core's `@whity/features/mcp`
 //! (`connect-clients.ts`), so the web connect wizard and this app describe
 //! each tool the same way. Keep the two in step.
 //!
