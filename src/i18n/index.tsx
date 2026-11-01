@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { Direction } from "radix-ui"
 import en from "./en.json"
 import ar from "./ar.json"
 
@@ -54,7 +55,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const toggle = useCallback(() => setLocale((current) => (current === "ar" ? "en" : "ar")), [])
   const value = useMemo(() => ({ locale, t, toggle }), [locale, t, toggle])
 
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
+  // Radix components set their own `dir`, and default to left to right.
+  return (
+    <I18nContext.Provider value={value}>
+      <Direction.Provider dir={locale === "ar" ? "rtl" : "ltr"}>{children}</Direction.Provider>
+    </I18nContext.Provider>
+  )
 }
 
 export function useI18n(): I18n {

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core"
+import { Channel, invoke } from "@tauri-apps/api/core"
 
 /**
  * The webview's whole view of the native side. Tokens never cross this line:
@@ -51,3 +51,22 @@ export const connectTool = (tool: string, connection: string, approvedHash: stri
   invoke<void>("connect_tool", { tool, connection, approvedHash })
 export const disconnectTool = (tool: string, connection: string) => invoke<void>("disconnect_tool", { tool, connection })
 export const restoreTool = (tool: string, connection: string) => invoke<void>("restore_tool", { tool, connection })
+
+/** A tool on this computer that can answer a chat. */
+export interface Engine {
+  id: string
+  name: string
+}
+
+/** What arrives during a chat turn. Engine session ids stay on the native side. */
+export type ChatEvent = { kind: "text"; text: string } | { kind: "tool"; name: string } | { kind: "error"; message: string }
+
+export const listEngines = () => invoke<Engine[]>("list_engines")
+export const sendChat = (engine: string, connection: string, message: string, onUpdate: (event: ChatEvent) => void) => {
+  const onEvent = new Channel<ChatEvent>()
+  onEvent.onmessage = onUpdate
+  return invoke<void>("send_chat", { engine, connection, message, onEvent })
+}
+export const stopChat = () => invoke<void>("stop_chat")
+export const newChat = () => invoke<void>("new_chat")
+export const openApprovals = (connection: string) => invoke<void>("open_approvals", { connection })

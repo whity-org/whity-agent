@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { listConnections, signIn, signOut, type Connection, type SignInError } from "./api"
 import { Button } from "@whity/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@whity/ui/tabs"
+import { ChatPanel } from "./chat-panel"
 import { useI18n, type MessageKey } from "./i18n"
 import { ToolsPanel } from "./tools-panel"
 
@@ -55,12 +57,23 @@ export function App() {
   }
 
   return (
-    <main className="mx-auto flex min-h-full max-w-xl flex-col gap-6 bg-background px-6 py-8 text-foreground">
+    <main className="mx-auto flex h-full max-w-xl flex-col gap-6 overflow-y-auto bg-background px-6 py-8 text-foreground">
       <header className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">{t("app.title")}</h1>
         <Button variant="outline" onClick={toggle}>{t("app.language")}</Button>
       </header>
 
+      <Tabs defaultValue="connections" className="flex min-h-0 flex-1 flex-col gap-4">
+        <TabsList>
+          <TabsTrigger value="connections">{t("tabs.connections")}</TabsTrigger>
+          <TabsTrigger value="chat">{t("tabs.chat")}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="chat" className="flex min-h-0 flex-1 flex-col">
+          <ChatPanel connections={connections} />
+        </TabsContent>
+
+        <TabsContent value="connections" className="flex flex-col gap-6">
       <section className="flex flex-col gap-3">
         <h2 className="text-base font-semibold">{t("connections.title")}</h2>
         <p className="text-muted-foreground">{t("connections.intro")}</p>
@@ -114,6 +127,8 @@ export function App() {
       </form>
 
       <ToolsPanel connections={connections} />
+        </TabsContent>
+      </Tabs>
     </main>
   )
 }

@@ -303,6 +303,15 @@ impl Environment {
     }
 }
 
+/// Keep a tool's command from opening a console window: the app has none of its
+/// own on Windows, so each one would flash a new one up.
+pub fn no_console(command: &mut tokio::process::Command) {
+    #[cfg(windows)]
+    command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    #[cfg(not(windows))]
+    let _ = command;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

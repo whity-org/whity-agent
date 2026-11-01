@@ -37,5 +37,22 @@
   "review.cancel": "Cancel",
   "review.signIn": "{tool} asks you to sign in to Whity the first time it uses the workspace.",
   "tools.viaBridge": "Connects through Whity Agent",
-  "review.viaBridge": "{tool} will run Whity Agent to reach the workspace. Your sign-in stays in your computer's keychain, not in this file."
+  "review.viaBridge": "{tool} will run Whity Agent to reach the workspace. Your sign-in stays in your computer's keychain, not in this file.",
+  "tabs.connections": "Workspaces and tools",
+  "tabs.chat": "Chat",
+  "chat.intro": "Ask about your workspace. The tool answering can use Whity and nothing else on this computer, and changes wait for approval when they need it.",
+  "chat.noEngine": "Chat runs on Claude Code or Codex, using your own account with them. Neither is on this computer yet.",
+  "chat.needsKeychain": "Chat needs your sign-in kept in your computer's keychain, and it isn't available.",
+  "chat.workspace": "Workspace",
+  "chat.engine": "Tool that answers",
+  "chat.through": "Through {tool}",
+  "chat.approvals": "Approvals",
+  "chat.new": "New chat",
+  "chat.working": "Working on it",
+  "chat.message": "Your message",
+  "chat.placeholder": "Ask about your workspace",
+  "chat.send": "Send",
+  "chat.stop": "Stop",
+  "chat.you": "You",
+  "chat.usedTool": "Used"
 }
