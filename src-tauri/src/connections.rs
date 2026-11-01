@@ -199,7 +199,13 @@ impl Connections {
         Ok(access)
     }
 
+    /// The client id to sign in with: whity-agent's published client metadata
+    /// document where the authorization server knows it (Whity ID), else a
+    /// public client registered there once (RFC 7591), for self-hosted servers.
     async fn client_id_for(&self, discovery: &oauth::Discovery) -> Result<String, String> {
+        if let Some(id) = oauth::metadata_document_client_id(&discovery.issuer) {
+            return Ok(id.to_string());
+        }
         if let Some(id) = self.state.lock().unwrap().clients.get(&discovery.issuer) {
             return Ok(id.clone());
         }

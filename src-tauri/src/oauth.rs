@@ -29,6 +29,24 @@ pub const CANCELLED: &str = "cancelled";
 
 pub const CLIENT_NAME: &str = "Whity Agent";
 
+/// whity-agent's Client ID Metadata Documents, by issuer: Whity ID knows the
+/// app as a first-party public client (PKCE S256, loopback `/callback` on any
+/// port), so no registration is needed there.
+const METADATA_DOCUMENT_CLIENTS: &[(&str, &str)] = &[(
+    "https://id.whity.dev",
+    "https://id.whity.dev/clients/whity-agent.json",
+)];
+
+/// The client id to use at an authorization server that publishes
+/// whity-agent's metadata document, if this is one.
+pub fn metadata_document_client_id(issuer: &str) -> Option<&'static str> {
+    let issuer = issuer.trim_end_matches('/');
+    METADATA_DOCUMENT_CLIENTS
+        .iter()
+        .find(|(known, _)| *known == issuer)
+        .map(|(_, client_id)| *client_id)
+}
+
 /// What a workspace and its authorization server say about signing in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Discovery {
@@ -472,6 +490,15 @@ mod tests {
         assert_eq!(get("resource"), Some("https://app.whity.dev/mcp"));
         assert_eq!(get("scope"), Some("tools:call resources:read"));
         assert_eq!(get("redirect_uri"), Some("http://127.0.0.1:5000/callback"));
+    }
+
+    #[test]
+    fn whity_id_uses_the_published_client_document() {
+        assert_eq!(
+            metadata_document_client_id("https://id.whity.dev/"),
+            Some("https://id.whity.dev/clients/whity-agent.json")
+        );
+        assert_eq!(metadata_document_client_id("https://id.example.com"), None);
     }
 
     #[test]
