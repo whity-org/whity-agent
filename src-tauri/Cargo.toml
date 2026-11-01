@@ -24,8 +24,9 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # HTTP to the workspace and its authorization server, from Rust only, so no
 # token ever enters the webview. rustls avoids a system OpenSSL.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-tokio = { version = "1", features = ["net", "time", "io-util", "macros", "rt-multi-thread", "sync", "process"] }
+tokio = { version = "1", features = ["net", "time", "io-util", "macros", "rt-multi-thread", "sync", "process", "io-std"] }
 url = "2"
+dirs = "6"
 sha2 = "0.10"
 base64 = "0.22"
 rand = "0.8"

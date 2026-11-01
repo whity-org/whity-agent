@@ -44,7 +44,6 @@ export type Proposal =
   | { kind: "command"; argv: string[]; server: string }
   | { kind: "file"; server: string; plan: { path: string; before: string; after: string; beforeHash: string } }
   | { kind: "nothing"; server: string }
-  | { kind: "needsBridge" }
 
 export const listTools = () => invoke<Tool[]>("list_tools")
 export const planConnect = (tool: string, connection: string) => invoke<Proposal>("plan_connect", { tool, connection })

@@ -79,6 +79,11 @@ impl StateFile {
         }
     }
 
+    /// The folder it lives in, shared by every whity-agent process.
+    pub fn dir(&self) -> &Path {
+        self.path.parent().unwrap_or(&self.path)
+    }
+
     /// The saved state, or an empty one when there is none yet. An unreadable
     /// file is treated as empty rather than blocking the app: it holds nothing
     /// that can't be recreated by signing in again.

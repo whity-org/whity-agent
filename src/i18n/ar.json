@@ -22,7 +22,6 @@
   "tools.none": "لم يُعثر على أدوات ذكاء اصطناعي على هذا الجهاز.",
   "tools.notInstalled": "غير موجودة على هذا الجهاز",
   "tools.signsInItself": "تسجّل الدخول بنفسها",
-  "tools.needsBridge": "تحتاج إلى جسر وكيل Whity، قريبًا",
   "tools.connectedTo": "مرتبطة بـ {workspace}",
   "tools.connect": "ربط",
   "tools.disconnect": "إلغاء الربط",
@@ -36,5 +35,7 @@
   "review.nothing": "{tool} مرتبطة بمساحة العمل هذه مسبقًا.",
   "review.confirm": "ربط",
   "review.cancel": "إلغاء",
-  "review.signIn": "تطلب منك {tool} تسجيل الدخول إلى Whity أول مرة تستخدم فيها مساحة العمل."
+  "review.signIn": "تطلب منك {tool} تسجيل الدخول إلى Whity أول مرة تستخدم فيها مساحة العمل.",
+  "tools.viaBridge": "تتصل عبر وكيل Whity",
+  "review.viaBridge": "ستشغّل {tool} وكيل Whity للوصول إلى مساحة العمل. يبقى تسجيل دخولك في سلسلة مفاتيح جهازك، لا في هذا الملف."
 }

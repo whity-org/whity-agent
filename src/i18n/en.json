@@ -22,7 +22,6 @@
   "tools.none": "No AI tools found on this computer.",
   "tools.notInstalled": "Not found on this computer",
   "tools.signsInItself": "Signs in by itself",
-  "tools.needsBridge": "Needs Whity Agent's bridge, coming soon",
   "tools.connectedTo": "Connected to {workspace}",
   "tools.connect": "Connect",
   "tools.disconnect": "Disconnect",
@@ -36,5 +35,7 @@
   "review.nothing": "{tool} is already connected to this workspace.",
   "review.confirm": "Connect",
   "review.cancel": "Cancel",
-  "review.signIn": "{tool} asks you to sign in to Whity the first time it uses the workspace."
+  "review.signIn": "{tool} asks you to sign in to Whity the first time it uses the workspace.",
+  "tools.viaBridge": "Connects through Whity Agent",
+  "review.viaBridge": "{tool} will run Whity Agent to reach the workspace. Your sign-in stays in your computer's keychain, not in this file."
 }

@@ -10,9 +10,56 @@ use crate::oauth::{self, Pkce, Tokens};
 use crate::store::{connection_id, keychain_account, Connection, SecretStore, State, StateFile};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use url::Url;
+
+/// Held while refreshing a token, across every whity-agent process. A lock file
+/// left by a crash stops counting after [`RefreshLock::STALE`].
+struct RefreshLock {
+    path: PathBuf,
+}
+
+impl RefreshLock {
+    const STALE: Duration = Duration::from_secs(30);
+
+    async fn acquire(dir: &Path) -> Result<Self, String> {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        let path = dir.join("refresh.lock");
+        let deadline = Instant::now() + Self::STALE + Duration::from_secs(5);
+        loop {
+            match std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
+                Ok(_) => return Ok(Self { path }),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    let stale = std::fs::metadata(&path)
+                        .and_then(|m| m.modified())
+                        .ok()
+                        .and_then(|at| at.elapsed().ok())
+                        .is_some_and(|age| age > Self::STALE);
+                    if stale {
+                        let _ = std::fs::remove_file(&path);
+                    } else if Instant::now() > deadline {
+                        return Err("another Whity Agent is still refreshing the sign-in".into());
+                    } else {
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    }
+                }
+                Err(e) => return Err(format!("can't take the sign-in lock: {e}")),
+            }
+        }
+    }
+}
+
+impl Drop for RefreshLock {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
 
 /// What the webview sees of a connection (src/api.ts). No tokens.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -31,8 +78,9 @@ pub struct Connections {
     state: Mutex<State>,
     /// Connections that last until the app closes (no refresh token, or no keychain).
     session_only: Mutex<Vec<Connection>>,
-    /// Access tokens, by connection id. Never written anywhere.
-    access: Mutex<HashMap<String, Tokens>>,
+    /// Access tokens and when each stops being usable, by connection id. Never
+    /// written anywhere.
+    access: Mutex<HashMap<String, (Tokens, Option<Instant>)>>,
     window: Duration,
 }
 
@@ -145,10 +193,7 @@ impl Connections {
             session.retain(|c| c.id != connection.id);
             session.push(connection.clone());
         }
-        self.access
-            .lock()
-            .unwrap()
-            .insert(connection.id.clone(), tokens);
+        self.remember(&connection.id, tokens);
 
         Ok(view(&connection, persisted))
     }
@@ -166,15 +211,16 @@ impl Connections {
         Ok(result)
     }
 
-    /// The host and MCP URL of a signed-in workspace. Tools name the server
-    /// after the host, which, unlike the workspace's own name, is unique.
-    pub fn workspace(&self, id: &str) -> Option<(String, String)> {
+    /// The host and MCP URL of a signed-in workspace, and whether its sign-in
+    /// is kept in the keychain. Tools name the server after the host, which,
+    /// unlike the workspace's own name, is unique.
+    pub fn workspace(&self, id: &str) -> Option<(String, String, bool)> {
         self.list().into_iter().find(|c| c.id == id).map(|c| {
             let host = url::Url::parse(&c.resource)
                 .ok()
                 .and_then(|u| u.host_str().map(str::to_string))
                 .unwrap_or_default();
-            (host, c.resource)
+            (host, c.resource, c.persisted)
         })
     }
 
@@ -192,10 +238,16 @@ impl Connections {
     /// A fresh access token for a connection: the one in memory, or a new one
     /// from the refresh token in the keychain. Rotated refresh tokens are
     /// stored back. For the MCP bridge and the chat (WHIT-824).
-    #[allow(dead_code)] // First used by the bridge and the chat (WHIT-824).
+    ///
+    /// Refresh tokens rotate, and the authorization server treats a reused one
+    /// as theft and revokes the whole chain. The app and any number of bridges
+    /// share one, so refreshing holds a lock across processes, and reads the
+    /// keychain inside it: whoever goes second uses what the first stored.
     pub async fn access_token(&self, id: &str) -> Result<String, String> {
-        if let Some(tokens) = self.access.lock().unwrap().get(id) {
-            return Ok(tokens.access_token.clone());
+        if let Some((tokens, expires)) = self.access.lock().unwrap().get(id) {
+            if expires.is_none_or(|at| at > Instant::now()) {
+                return Ok(tokens.access_token.clone());
+            }
         }
         let connection = self
             .state
@@ -206,6 +258,7 @@ impl Connections {
             .find(|c| c.id == id)
             .cloned()
             .ok_or("not signed in")?;
+        let _lock = RefreshLock::acquire(self.file.dir()).await?;
         let account = keychain_account(id);
         let refresh = self.secrets.get(&account)?.ok_or("not signed in")?;
         let tokens = oauth::refresh(
@@ -220,8 +273,24 @@ impl Connections {
             self.secrets.set(&account, rotated)?;
         }
         let access = tokens.access_token.clone();
-        self.access.lock().unwrap().insert(id.to_string(), tokens);
+        self.remember(id, tokens);
         Ok(access)
+    }
+
+    /// Drop a cached access token the server refused, so the next use refreshes.
+    pub fn forget_access_token(&self, id: &str) {
+        self.access.lock().unwrap().remove(id);
+    }
+
+    /// Keep an access token until a minute before it expires.
+    fn remember(&self, id: &str, tokens: Tokens) {
+        let expires = tokens
+            .expires_in
+            .map(|seconds| Instant::now() + Duration::from_secs(seconds.saturating_sub(60)));
+        self.access
+            .lock()
+            .unwrap()
+            .insert(id.to_string(), (tokens, expires));
     }
 
     /// The client id to sign in with: whity-agent's published client metadata
@@ -447,6 +516,21 @@ mod tests {
         assert_eq!(restarted.access_token(&view.id).await.unwrap(), "at-1");
         let (_, form) = server.posts.lock().unwrap().last().cloned().unwrap();
         assert!(form.contains("grant_type=refresh_token") && form.contains("refresh_token=rt-1"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_lock_left_by_a_crash_stops_counting() {
+        let dir = std::env::temp_dir().join(format!("whity-agent-test-{}", oauth::random_token()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let left = std::fs::File::create(dir.join("refresh.lock")).unwrap();
+        left.set_modified(std::time::SystemTime::now() - Duration::from_secs(120))
+            .unwrap();
+        drop(left);
+
+        let lock = RefreshLock::acquire(&dir).await.unwrap();
+        drop(lock);
+        assert!(!dir.join("refresh.lock").exists(), "released when dropped");
         std::fs::remove_dir_all(dir).unwrap();
     }
 

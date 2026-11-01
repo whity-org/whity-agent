@@ -25,8 +25,6 @@ pub enum Proposal {
     File { plan: Plan, server: String },
     /// Already connected exactly so; nothing to do.
     Nothing { server: String },
-    /// Needs whity-agent's local bridge, which comes with WHIT-824.
-    NeedsBridge,
 }
 
 /// A found tool and the workspaces it is connected to.
@@ -64,6 +62,8 @@ pub struct Linker {
     pub env: Environment,
     pub backups: PathBuf,
     pub command_timeout: Duration,
+    /// This executable, which a bridge tool's config runs as `mcp --connection <id>`.
+    pub executable: Option<PathBuf>,
 }
 
 impl Linker {
@@ -83,12 +83,50 @@ impl Linker {
             .collect()
     }
 
-    /// What connecting `tool_id` to a workspace at `url` would do. Changes nothing.
-    pub fn plan(&self, tool_id: &str, workspace: &str, url: &str) -> Result<Proposal, String> {
+    /// What connecting `tool_id` to a workspace at `url` would do. Changes
+    /// nothing. `bridge` is the connection id when its sign-in is in the keychain,
+    /// which is what a bridge running later, on its own, needs.
+    pub fn plan(
+        &self,
+        tool_id: &str,
+        workspace: &str,
+        url: &str,
+        bridge: Option<&str>,
+    ) -> Result<Proposal, String> {
         let tool = tools::tool(tool_id).ok_or("unknown tool")?;
         let server = server_name(workspace);
         match tool.method {
-            Method::Bridge => Ok(Proposal::NeedsBridge),
+            Method::Bridge => {
+                let connection = bridge.ok_or(
+                    "this tool connects through Whity Agent, which keeps its sign-in in your computer's keychain, and that isn't available",
+                )?;
+                let shape = tool.json.ok_or("no config shape")?;
+                let path = self
+                    .env
+                    .config_path(tool)
+                    .ok_or("no config file for this computer")?;
+                let executable = self
+                    .executable
+                    .as_ref()
+                    .ok_or("can't find Whity Agent's own program")?;
+                let args = vec![
+                    "mcp".to_string(),
+                    "--connection".to_string(),
+                    connection.to_string(),
+                ];
+                let plan = config_writer::plan_add_command(
+                    &path,
+                    shape.container,
+                    &server,
+                    &executable.display().to_string(),
+                    &args,
+                )?;
+                if plan.changes_nothing() {
+                    Ok(Proposal::Nothing { server })
+                } else {
+                    Ok(Proposal::File { plan, server })
+                }
+            }
             Method::Command => {
                 let add = tool.add.ok_or("no add command")?;
                 let mut argv = add(&server, url);
@@ -127,11 +165,6 @@ impl Linker {
         approved: &Proposal,
     ) -> Result<Link, String> {
         Ok(match approved {
-            Proposal::NeedsBridge => {
-                return Err(
-                    "this tool needs whity-agent's bridge, which isn't available yet".into(),
-                )
-            }
             Proposal::Nothing { server } => Link {
                 tool: tool_id.into(),
                 connection: connection_id.into(),
@@ -251,6 +284,7 @@ mod tests {
             },
             backups: home.join("backups"),
             command_timeout: Duration::from_secs(10),
+            executable: Some(home.join("whity-agent")),
         }
     }
 
@@ -274,7 +308,12 @@ mod tests {
         let mut state = State::default();
 
         let proposal = linker
-            .plan("cursor", "Example Bakery", "https://app.whity.dev/mcp")
+            .plan(
+                "cursor",
+                "Example Bakery",
+                "https://app.whity.dev/mcp",
+                None,
+            )
             .unwrap();
         let Proposal::File { plan, .. } = &proposal else {
             panic!("expected a file edit, got {proposal:?}")
@@ -316,7 +355,12 @@ mod tests {
         std::fs::create_dir_all(home.join(".cursor")).unwrap();
         let linker = linker(&home, vec![]);
         let proposal = linker
-            .plan("cursor", "Example Bakery", "https://app.whity.dev/mcp")
+            .plan(
+                "cursor",
+                "Example Bakery",
+                "https://app.whity.dev/mcp",
+                None,
+            )
             .unwrap();
         let link = linker.connect("cursor", "conn-1", &proposal).await.unwrap();
 
@@ -333,15 +377,61 @@ mod tests {
         std::fs::remove_dir_all(home).unwrap();
     }
 
-    #[test]
-    fn a_tool_without_its_own_sign_in_waits_for_the_bridge() {
+    #[tokio::test]
+    async fn a_tool_without_its_own_sign_in_runs_the_bridge_with_no_secret() {
         let home = temp();
+        let linker = linker(&home, vec![]);
+
+        let proposal = linker
+            .plan(
+                "windsurf",
+                "app.whity.dev",
+                "https://app.whity.dev/mcp",
+                Some("conn-1"),
+            )
+            .unwrap();
+        let Proposal::File { plan, server } = &proposal else {
+            panic!("expected a file edit, got {proposal:?}")
+        };
+        assert_eq!(server, "whity-app-whity-dev");
+        let after: serde_json::Value = serde_json::from_str(&plan.after).unwrap();
+        let entry = &after["mcpServers"]["whity-app-whity-dev"];
         assert_eq!(
-            linker(&home, vec![])
-                .plan("windsurf", "Example Bakery", "https://app.whity.dev/mcp")
-                .unwrap(),
-            Proposal::NeedsBridge
+            entry["command"],
+            home.join("whity-agent").display().to_string()
         );
+        assert_eq!(
+            entry["args"],
+            serde_json::json!(["mcp", "--connection", "conn-1"])
+        );
+        assert!(
+            !plan.after.to_lowercase().contains("bearer") && !plan.after.contains("https://"),
+            "only a connection id"
+        );
+
+        let link = linker
+            .connect("windsurf", "conn-1", &proposal)
+            .await
+            .unwrap();
+        linker.disconnect(&link).await.unwrap();
+        assert!(!std::fs::read_to_string(&plan.path)
+            .unwrap()
+            .contains("whity-app-whity-dev"));
+        std::fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
+    fn without_a_keychain_a_bridge_tool_says_why() {
+        let home = temp();
+        let error = linker(&home, vec![])
+            .plan(
+                "windsurf",
+                "app.whity.dev",
+                "https://app.whity.dev/mcp",
+                None,
+            )
+            .unwrap_err();
+        assert!(error.contains("keychain"));
         std::fs::remove_dir_all(home).unwrap();
     }
 
@@ -353,7 +443,12 @@ mod tests {
         std::fs::write(bin.join("claude"), b"").unwrap();
 
         let proposal = linker(&home, vec![bin.clone()])
-            .plan("claude-code", "Example Bakery", "https://app.whity.dev/mcp")
+            .plan(
+                "claude-code",
+                "Example Bakery",
+                "https://app.whity.dev/mcp",
+                None,
+            )
             .unwrap();
         let Proposal::Command { argv, server } = proposal else {
             panic!()
@@ -375,7 +470,7 @@ mod tests {
         assert_eq!(server, "whity-example-bakery");
         assert!(
             linker(&home, vec![])
-                .plan("claude-code", "x", "https://app.whity.dev/mcp")
+                .plan("claude-code", "x", "https://app.whity.dev/mcp", None)
                 .is_err(),
             "not installed"
         );

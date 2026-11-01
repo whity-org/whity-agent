@@ -19,7 +19,8 @@ pub enum Method {
     Command,
     /// Add a URL-only entry to the tool's JSON config; the tool signs in itself.
     File,
-    /// The tool can't sign in itself: it needs whity-agent's local bridge (WHIT-824).
+    /// The tool can't sign in itself: its JSON config runs whity-agent's local
+    /// bridge as a command, which holds the sign-in (WHIT-824).
     Bridge,
 }
 
@@ -173,7 +174,11 @@ pub const TOOLS: &[Tool] = &[
         method: Method::Bridge,
         add: None,
         remove: None,
-        json: None,
+        json: Some(JsonEntry {
+            container: "mcpServers",
+            url_key: "url",
+            http_type: false,
+        }),
     },
     Tool {
         id: "claude",
@@ -192,7 +197,11 @@ pub const TOOLS: &[Tool] = &[
         method: Method::Bridge,
         add: None,
         remove: None,
-        json: None,
+        json: Some(JsonEntry {
+            container: "mcpServers",
+            url_key: "url",
+            http_type: false,
+        }),
     },
 ];
 
