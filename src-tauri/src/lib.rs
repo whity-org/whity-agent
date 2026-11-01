@@ -2,6 +2,7 @@
 //! network request, token, keychain entry, file write and tool command stays
 //! in Rust. No command takes a file path or a command line from the webview.
 
+mod bridge;
 mod config_writer;
 mod connections;
 mod linking;
@@ -60,10 +61,10 @@ fn plan_connect(
     tool: String,
     connection: String,
 ) -> Result<Proposal, String> {
-    let (host, url) = connections
+    let (host, url, persisted) = connections
         .workspace(&connection)
         .ok_or("not signed in to that workspace")?;
-    linker.plan(&tool, &host, &url)
+    linker.plan(&tool, &host, &url, persisted.then_some(connection.as_str()))
 }
 
 /// Do it. The plan is made again here; for a file edit, `approved_hash` is the
@@ -77,10 +78,10 @@ async fn connect_tool(
     connection: String,
     approved_hash: Option<String>,
 ) -> Result<(), String> {
-    let (host, url) = connections
+    let (host, url, persisted) = connections
         .workspace(&connection)
         .ok_or("not signed in to that workspace")?;
-    let proposal = linker.plan(&tool, &host, &url)?;
+    let proposal = linker.plan(&tool, &host, &url, persisted.then_some(connection.as_str()))?;
     if let Proposal::File { plan, .. } = &proposal {
         if approved_hash.as_deref() != Some(plan.before_hash.as_str()) {
             return Err(
@@ -140,6 +141,45 @@ fn restore_tool(
     })
 }
 
+/// `whity-agent mcp --connection <id>`: the stdio bridge, with no window. It finds
+/// its state where the app keeps it: Tauri's app config dir is the OS config
+/// folder and the identifier in tauri.conf.json. Returns the process's exit code.
+pub fn run_bridge(args: &[String]) -> i32 {
+    let connection = match args {
+        [flag, id] if flag == "--connection" => id,
+        _ => {
+            eprintln!("usage: whity-agent mcp --connection <id>");
+            return 2;
+        }
+    };
+    let Some(dir) = dirs::config_dir().map(|d| d.join("dev.whity.agent")) else {
+        eprintln!("whity-agent: can't find the config folder");
+        return 1;
+    };
+    let connections = Connections::new(StateFile::new(&dir), Box::new(OsKeychain));
+    let Some((_, url, true)) = connections.workspace(connection) else {
+        eprintln!("whity-agent: not signed in to that workspace; open Whity Agent and sign in");
+        return 1;
+    };
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            eprintln!("whity-agent: {e}");
+            return 1;
+        }
+    };
+    match runtime.block_on(bridge::Bridge::new(&connections, connection, &url).run()) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("whity-agent: {e}");
+            1
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -151,6 +191,7 @@ pub fn run() {
                 env: tools::Environment::current(),
                 backups: app.path().app_data_dir()?.join("backups"),
                 command_timeout: Duration::from_secs(60),
+                executable: std::env::current_exe().ok(),
             });
             Ok(())
         })

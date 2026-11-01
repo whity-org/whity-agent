@@ -11,7 +11,9 @@ Design: [Agent personas, presets and whity-agent](https://github.com/whity-org/w
 - **Find and connect your AI tools.** Claude Code, Codex CLI, Gemini CLI, VS Code, Cursor, Windsurf and Claude Desktop are found by looking at PATH and their config files only, never by running them. Connecting shows exactly what will happen first (the tool's own command, or the file before and after) and does nothing until you confirm. Tools get the workspace's URL and sign in themselves; no token is ever written. File edits touch only our entry, refuse a file that changed since you reviewed it or isn't plain JSON, keep a backup, write atomically, and can be undone (`src-tauri/src/tools.rs`, `config_writer.rs`, `linking.rs`). The tool list mirrors `local` in whity-core's `@whity-org/features/mcp`.
 - English and Arabic (right to left), light and dark, with Whity's design tokens.
 
-Next: the MCP bridge (for Windsurf and Claude Desktop), chat and signed updates (WHIT-824).
+- **A local bridge for tools that can't sign in themselves.** Windsurf and Claude Desktop run `whity-agent mcp --connection <id>`, a stdio MCP server that relays to your workspace. Their config holds that command and nothing secret; the sign-in stays in the keychain (`src-tauri/src/bridge.rs`).
+
+Next: chat and signed updates (WHIT-824).
 
 ## Develop
 

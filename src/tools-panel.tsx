@@ -84,10 +84,10 @@ export function ToolsPanel({ connections }: { connections: Connection[] }) {
               <div className="flex min-w-0 flex-col gap-1">
                 <span className="font-medium">{tool.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {tool.method === "bridge" ? t("tools.needsBridge") : t("tools.signsInItself")}
+                  {tool.method === "bridge" ? t("tools.viaBridge") : t("tools.signsInItself")}
                 </span>
               </div>
-              {tool.method !== "bridge" && first !== undefined && !tool.connections.includes(first.id) && (
+              {first !== undefined && !tool.connections.includes(first.id) && (
                 <Button disabled={busy} onClick={() => openReview(tool, first)}>
                   {t("tools.connect")}
                 </Button>
@@ -97,7 +97,7 @@ export function ToolsPanel({ connections }: { connections: Connection[] }) {
               <div key={id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span>{t("tools.connectedTo", { workspace: workspaceName(id) })}</span>
                 <span className="flex gap-2">
-                  {tool.method === "file" && (
+                  {tool.method !== "command" && (
                     <Button disabled={busy} onClick={() => act(() => restoreTool(tool.id, id))}>
                       {t("tools.restore")}
                     </Button>
@@ -187,19 +187,16 @@ function ReviewSheet({
               </div>
             ))}
           </div>
-          <p className="text-muted-foreground">{t("review.signIn", { tool: tool.name })}</p>
+          <p className="text-muted-foreground">{t(tool.method === "bridge" ? "review.viaBridge" : "review.signIn", { tool: tool.name })}</p>
         </>
       )}
 
       {proposal.kind === "nothing" && <p>{t("review.nothing", { tool: tool.name })}</p>}
-      {proposal.kind === "needsBridge" && <p>{t("tools.needsBridge")}</p>}
 
       <div className="flex gap-2 pt-1">
-        {(proposal.kind === "command" || proposal.kind === "file" || proposal.kind === "nothing") && (
-          <Button variant="main" disabled={busy} onClick={onConfirm}>
-            {t("review.confirm")}
-          </Button>
-        )}
+        <Button variant="main" disabled={busy} onClick={onConfirm}>
+          {t("review.confirm")}
+        </Button>
         <Button disabled={busy} onClick={onCancel}>
           {t("review.cancel")}
         </Button>

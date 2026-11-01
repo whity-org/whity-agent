@@ -86,23 +86,50 @@ fn render(map: &Map<String, Value>) -> String {
 /// The text with a URL-only entry `name` added under the app's server list.
 pub fn plan_add(path: &Path, shape: JsonEntry, name: &str, url: &str) -> Result<Plan, String> {
     let before = read(path)?.unwrap_or_default();
-    let mut root = parse(path, &before)?;
-
     let mut entry = Map::new();
     if shape.http_type {
         entry.insert("type".into(), Value::String("http".into()));
     }
     entry.insert(shape.url_key.into(), Value::String(url.into()));
-    let entry = Value::Object(entry);
+    plan_entry(path, shape.container, name, Value::Object(entry), before)
+}
+
+/// The text with a command entry `name` added: whity-agent's bridge, which holds
+/// no secret, only a connection id in its arguments.
+pub fn plan_add_command(
+    path: &Path,
+    container: &str,
+    name: &str,
+    command: &str,
+    args: &[String],
+) -> Result<Plan, String> {
+    let before = read(path)?.unwrap_or_default();
+    plan_entry(
+        path,
+        container,
+        name,
+        serde_json::json!({ "command": command, "args": args }),
+        before,
+    )
+}
+
+fn plan_entry(
+    path: &Path,
+    container: &str,
+    name: &str,
+    entry: Value,
+    before: String,
+) -> Result<Plan, String> {
+    let mut root = parse(path, &before)?;
 
     let servers = root
-        .entry(shape.container)
+        .entry(container)
         .or_insert_with(|| Value::Object(Map::new()));
     let Value::Object(servers) = servers else {
         return Err(format!(
             "{} has an unexpected `{}`; left alone",
             path.display(),
-            shape.container
+            container
         ));
     };
     match servers.get(name) {
