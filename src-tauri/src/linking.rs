@@ -243,12 +243,13 @@ impl Linker {
 /// Run a tool's own command directly (no shell), with a time limit.
 async fn run(argv: &[String], timeout: Duration) -> Result<(), String> {
     let (program, args) = argv.split_first().ok_or("empty command")?;
-    let child = tokio::process::Command::new(program)
+    let mut command = tokio::process::Command::new(program);
+    command
         .args(args)
         .stdin(std::process::Stdio::null())
-        .kill_on_drop(true)
-        .output();
-    let output = tokio::time::timeout(timeout, child)
+        .kill_on_drop(true);
+    crate::tools::no_console(&mut command);
+    let output = tokio::time::timeout(timeout, command.output())
         .await
         .map_err(|_| "the tool's command took too long".to_string())?
         .map_err(|e| format!("couldn't run {program}: {e}"))?;
