@@ -10,9 +10,70 @@
 //! stdio transport requires. Messages are relayed one at a time, in order.
 
 use crate::connections::Connections;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
+
+/// An agent the person granted, as `init_session` names it on their own connection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GrantedAgent {
+    pub slug: String,
+    pub name: String,
+    pub role: String,
+}
+
+/// The agents a person granted in a workspace, in their language. Asked over MCP
+/// because a person's token reads nothing else there, and an older workspace
+/// that doesn't say simply has none.
+pub async fn granted_agents(
+    connections: &Connections,
+    connection_id: &str,
+    endpoint: &str,
+    language: &str,
+) -> Result<Vec<GrantedAgent>, String> {
+    let mut bridge = Bridge::new(connections, connection_id, endpoint);
+    let call = |id: u8, method: &str, params: Value| {
+        json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params }).to_string()
+    };
+    let initialize = call(
+        1,
+        "initialize",
+        json!({
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": { "name": "whity-agent", "version": env!("CARGO_PKG_VERSION") },
+        }),
+    );
+    bridge.handle_line(&initialize).await;
+    let lines = bridge
+        .handle_line(&call(
+            2,
+            "tools/call",
+            json!({ "name": "init_session", "arguments": { "language": language } }),
+        ))
+        .await;
+    let answer: Value = lines
+        .last()
+        .and_then(|line| serde_json::from_str(line).ok())
+        .ok_or("the workspace didn't answer")?;
+    if let Some(message) = answer.pointer("/error/message").and_then(Value::as_str) {
+        return Err(message.to_string());
+    }
+    let briefing: Value = answer
+        .pointer("/result/content/0/text")
+        .and_then(Value::as_str)
+        .and_then(|text| serde_json::from_str(text).ok())
+        .ok_or("the workspace's answer couldn't be read")?;
+    Ok(briefing
+        .get("grantedAgents")
+        .cloned()
+        .and_then(|list| serde_json::from_value::<Vec<GrantedAgent>>(list).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|agent| crate::oauth::is_agent_slug(&agent.slug))
+        .collect())
+}
 
 /// The per-request protocol version in `params._meta`, from MCP 2026-07-28.
 const META_VERSION: &str = "io.modelcontextprotocol/protocolVersion";
@@ -352,6 +413,7 @@ mod tests {
                 issuer: origin.into(),
                 token_endpoint: format!("{origin}/oauth/token"),
                 client_id: "client-1".into(),
+                agent: None,
             }],
             ..State::default()
         };
@@ -400,6 +462,64 @@ mod tests {
             Some("Bearer at-1")
         );
         assert!(!out[0].contains("at-1"), "the token never reaches the tool");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_persons_granted_agents_are_read_from_their_briefing() {
+        let server = mock(|body| {
+            let message: Value = serde_json::from_str(body).unwrap();
+            let result = if message["method"] == "tools/call" {
+                assert_eq!(message["params"]["arguments"]["language"], "ar");
+                let briefing = json!({ "grantedAgents": [
+                    { "slug": "finance-clerk", "name": "Clerk", "role": "Invoices" },
+                    { "slug": "../evil", "name": "Bad", "role": "" },
+                ] });
+                json!({ "content": [{ "type": "text", "text": briefing.to_string() }] })
+            } else {
+                json!({ "protocolVersion": "2025-06-18" })
+            };
+            (
+                200,
+                "application/json",
+                json!({ "jsonrpc": "2.0", "id": message["id"], "result": result }).to_string(),
+            )
+        });
+        let (connections, dir) = signed_in(&server.origin);
+
+        let agents = granted_agents(&connections, "c1", &format!("{}/mcp", server.origin), "ar")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            agents,
+            vec![GrantedAgent {
+                slug: "finance-clerk".into(),
+                name: "Clerk".into(),
+                role: "Invoices".into()
+            }]
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_workspace_that_doesnt_say_has_no_granted_agents() {
+        let server = mock(|body| {
+            let id = serde_json::from_str::<Value>(body).unwrap()["id"].clone();
+            let result = json!({ "protocolVersion": "2025-06-18", "content": [{ "type": "text", "text": "{}" }] });
+            (
+                200,
+                "application/json",
+                json!({ "jsonrpc": "2.0", "id": id, "result": result }).to_string(),
+            )
+        });
+        let (connections, dir) = signed_in(&server.origin);
+
+        let agents = granted_agents(&connections, "c1", &format!("{}/mcp", server.origin), "en")
+            .await
+            .unwrap();
+
+        assert!(agents.is_empty());
         std::fs::remove_dir_all(dir).unwrap();
     }
 

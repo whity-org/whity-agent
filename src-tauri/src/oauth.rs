@@ -101,6 +101,15 @@ fn is_loopback(host: &str) -> bool {
     matches!(host, "localhost" | "127.0.0.1" | "[::1]") || host.ends_with(".localhost")
 }
 
+/// A workspace agent's slug, as core's router takes it: it goes into a URL.
+pub fn is_agent_slug(slug: &str) -> bool {
+    slug.len() <= 48
+        && slug.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && slug
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
 /// An endpoint the metadata names must be https, or loopback http.
 fn checked_endpoint(value: &str) -> Result<String, String> {
     let url = Url::parse(value).map_err(|_| format!("bad endpoint {value}"))?;
@@ -133,10 +142,15 @@ struct AuthorizationServerMetadata {
     code_challenge_methods_supported: Vec<String>,
 }
 
-/// Steps 1 and 2: who signs people in for this workspace, and where.
-pub async fn discover(http: &reqwest::Client, origin: &Url) -> Result<Discovery, String> {
+/// Steps 1 and 2: who signs people in for this workspace's MCP resource at
+/// `path` (`mcp`, or `mcp/agents/<slug>`), and where.
+pub async fn discover(
+    http: &reqwest::Client,
+    origin: &Url,
+    path: &str,
+) -> Result<Discovery, String> {
     let prm_url = origin
-        .join(".well-known/oauth-protected-resource/mcp")
+        .join(&format!(".well-known/oauth-protected-resource/{path}"))
         .map_err(|e| e.to_string())?;
     let response = http.get(prm_url).send().await.map_err(|e| e.to_string())?;
     if !response.status().is_success() {
@@ -152,7 +166,7 @@ pub async fn discover(http: &reqwest::Client, origin: &Url) -> Result<Discovery,
     // The resource must be this workspace's own, or a token for it would be
     // a token for someone else.
     let resource = Url::parse(&prm.resource).map_err(|_| NO_SIGN_IN.to_string())?;
-    if resource.origin() != origin.origin() {
+    if resource.origin() != origin.origin() || !resource.path().ends_with(&format!("/{path}")) {
         return Err(format!(
             "the workspace named another resource: {}",
             prm.resource

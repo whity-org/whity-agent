@@ -49,7 +49,7 @@ pub fn server_name(workspace: &str) -> String {
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("-");
-    let slug: String = slug.chars().take(40).collect();
+    let slug: String = slug.chars().take(64).collect();
     let slug = slug.trim_end_matches('-');
     if slug.is_empty() {
         "whity".into()
@@ -294,6 +294,10 @@ mod tests {
         assert_eq!(server_name("Example Bakery"), "whity-example-bakery");
         assert_eq!(server_name("app.whity.dev"), "whity-app-whity-dev");
         assert_eq!(server_name("مخبز"), "whity");
+        assert_eq!(
+            server_name("app.whity.dev finance-clerk"),
+            "whity-app-whity-dev-finance-clerk"
+        );
     }
 
     #[tokio::test]

@@ -15,7 +15,9 @@ Design: [Agent personas, presets and whity-agent](https://github.com/whity-org/w
 
 - **Chat with your workspace.** Runs Claude Code or Codex headless on your own account with them, connected through the bridge, with Whity's tools and nothing else: no files, no shell, none of your other MCP servers, hooks or plugins (`src-tauri/src/chat.rs`). Your words go over stdin, and tokens stay out of it. The tool keeps its own session files as it always does; Whity Agent doesn't save the conversation.
 
-Next: agents in chat, and signed updates (WHIT-824).
+- **Act as one of your agents.** Agents you've granted appear under their workspace. Signing in as one adds a connection to `/mcp/agents/<slug>`, which the chat and the tools can use in place of you. The server enforces that agent's grant.
+
+Next: signed updates (WHIT-824).
 
 ## Develop
 

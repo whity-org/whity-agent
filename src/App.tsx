@@ -1,5 +1,15 @@
 import { useEffect, useState, type FormEvent } from "react"
-import { listConnections, signIn, signOut, type Connection, type SignInError } from "./api"
+import {
+  connectionName,
+  listConnections,
+  listGrantedAgents,
+  signIn,
+  signInAgent,
+  signOut,
+  type Connection,
+  type GrantedAgent,
+  type SignInError,
+} from "./api"
 import { Button } from "@whity/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@whity/ui/tabs"
 import { ChatPanel } from "./chat-panel"
@@ -85,7 +95,10 @@ export function App() {
             {connections.map((c) => (
               <li key={c.id} className="flex items-center justify-between gap-3 rounded-card border border-border bg-card p-4">
                 <div className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate font-medium">{c.name ?? new URL(c.resource).host}</span>
+                  <span className="truncate font-medium">
+                    {connectionName(c)}
+                    {c.agent !== null && <span className="text-xs font-normal text-muted-foreground"> · {t("connections.agent")}</span>}
+                  </span>
                   <span className="truncate text-xs text-muted-foreground" dir="ltr">
                     {new URL(c.resource).host}
                   </span>
@@ -99,6 +112,18 @@ export function App() {
             ))}
           </ul>
         )}
+
+        {connections
+          .filter((c) => c.agent === null)
+          .map((c) => (
+            <GrantedAgents
+              key={c.id}
+              connection={c}
+              signedIn={connections.filter((other) => other.agent !== null && new URL(other.resource).origin === new URL(c.resource).origin)}
+              onSignedIn={(agent) => setConnections((current) => [...current.filter((other) => other.id !== agent.id), agent])}
+              onError={(e) => setError(describe(e))}
+            />
+          ))}
       </section>
 
       <form onSubmit={submit} className="flex flex-col gap-2">
@@ -130,5 +155,63 @@ export function App() {
         </TabsContent>
       </Tabs>
     </main>
+  )
+}
+
+/**
+ * The agents the person has granted in a workspace, each a sign-in of its own
+ * for the chat and for tools. Granting one happens in the workspace; a
+ * workspace that can't say lists none.
+ */
+function GrantedAgents({
+  connection,
+  signedIn,
+  onSignedIn,
+  onError,
+}: {
+  connection: Connection
+  signedIn: Connection[]
+  onSignedIn: (agent: Connection) => void
+  onError: (e: unknown) => void
+}) {
+  const { t, locale } = useI18n()
+  const [agents, setAgents] = useState<GrantedAgent[]>([])
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    listGrantedAgents(connection.id, locale).then(setAgents, () => setAgents([]))
+  }, [connection.id, locale])
+
+  const waiting = agents.filter((a) => !signedIn.some((c) => c.agent === a.slug))
+  if (waiting.length === 0) return null
+
+  const use = async (slug: string) => {
+    setBusy(true)
+    try {
+      onSignedIn(await signInAgent(connection.id, slug))
+    } catch (e) {
+      onError(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="font-medium">{t("connections.grantedAgents", { workspace: connectionName(connection) })}</h3>
+      <ul className="flex flex-col gap-2">
+        {waiting.map((agent) => (
+          <li key={agent.slug} className="flex items-center justify-between gap-3 rounded-card border border-border bg-card p-4">
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className="truncate font-medium">{agent.name}</span>
+              <span className="text-xs text-muted-foreground">{agent.role}</span>
+            </div>
+            <Button variant="outline" disabled={busy} onClick={() => use(agent.slug)}>
+              {t("connections.useAgent")}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

@@ -15,6 +15,8 @@ export interface Connection {
   issuer: string
   /** Whether the sign-in is kept in the OS keychain, or lasts until the app closes. */
   persisted: boolean
+  /** The workspace agent this sign-in acts as, or null for the person themselves. */
+  agent: string | null
 }
 
 /** Error codes the native side answers with; anything else is a free-text reason. */
@@ -70,3 +72,17 @@ export const sendChat = (engine: string, connection: string, message: string, on
 export const stopChat = () => invoke<void>("stop_chat")
 export const newChat = () => invoke<void>("new_chat")
 export const openApprovals = (connection: string) => invoke<void>("open_approvals", { connection })
+
+/** An agent the person has granted in a workspace. */
+export interface GrantedAgent {
+  slug: string
+  name: string
+  role: string
+}
+
+export const listGrantedAgents = (connection: string, language: string) =>
+  invoke<GrantedAgent[]>("list_granted_agents", { connection, language })
+export const signInAgent = (connection: string, slug: string) => invoke<Connection>("sign_in_agent", { connection, slug })
+
+/** How a sign-in is named on screen: the workspace, or the agent in it. */
+export const connectionName = (connection: Connection) => connection.name ?? new URL(connection.resource).host

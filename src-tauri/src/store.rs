@@ -26,6 +26,10 @@ pub struct Connection {
     pub issuer: String,
     pub token_endpoint: String,
     pub client_id: String,
+    /// The workspace agent this sign-in acts as (`/mcp/agents/<slug>`), or none
+    /// for the person themselves.
+    #[serde(default)]
+    pub agent: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -208,6 +212,7 @@ mod tests {
             issuer: "https://id.whity.dev".into(),
             token_endpoint: "https://id.whity.dev/oauth/token".into(),
             client_id: "client-1".into(),
+            agent: None,
         });
         state
             .clients

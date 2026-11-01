@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { Button } from "@whity/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@whity/ui/select"
 import { Textarea } from "@whity/ui/textarea"
-import { listEngines, newChat, openApprovals, sendChat, stopChat, type ChatEvent, type Connection, type Engine } from "./api"
+import { connectionName, listEngines, newChat, openApprovals, sendChat, stopChat, type ChatEvent, type Connection, type Engine } from "./api"
 import { useI18n } from "./i18n"
 
 /** A line of the conversation. Whatever the model wrote is shown as plain text, never as markup. */
@@ -107,7 +107,7 @@ export function ChatPanel({ connections }: { connections: Connection[] }) {
             <SelectContent>
               {workspaces.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
-                  {c.name ?? new URL(c.resource).host}
+                  {c.agent === null ? connectionName(c) : t("chat.asAgent", { agent: connectionName(c) })}
                 </SelectItem>
               ))}
             </SelectContent>
