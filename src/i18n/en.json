@@ -1,0 +1,20 @@
+{
+  "app.title": "Whity Agent",
+  "app.language": "العربية",
+  "connections.title": "Workspaces",
+  "connections.intro": "Connect a Whity workspace. Your AI tools then reach it through this app, with your own access.",
+  "connections.empty": "No workspace connected yet.",
+  "connections.address": "Workspace address",
+  "connections.signIn": "Sign in",
+  "connections.signingIn": "Finish signing in in your browser…",
+  "connections.signOut": "Sign out",
+  "connections.via": "through {issuer}",
+  "connections.kept": "Kept in your computer's keychain",
+  "connections.sessionOnly": "Until you close the app",
+  "errors.invalidAddress": "Enter a workspace address, such as app.whity.dev.",
+  "errors.noSignIn": "This workspace doesn't offer sign-in for apps yet.",
+  "errors.signInFailed": "Sign-in didn't finish: {reason}",
+  "errors.cancelled": "Sign-in was cancelled in the browser.",
+  "errors.timedOut": "Sign-in took too long. Try again.",
+  "errors.keychain": "Your computer's keychain isn't available, so this sign-in lasts until you close the app."
+}

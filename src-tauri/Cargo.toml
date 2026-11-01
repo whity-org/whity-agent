@@ -1,0 +1,45 @@
+[package]
+name = "whity-agent"
+version = "0.1.0"
+description = "Whity's desktop companion: connects local AI tools to a Whity workspace over MCP."
+authors = ["Whity contributors"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.90"
+
+[lib]
+# The `_lib` suffix keeps the lib name distinct from the bin on Windows
+# (rust-lang/cargo#8519).
+name = "whity_agent_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# HTTP to the workspace and its authorization server, from Rust only, so no
+# token ever enters the webview. rustls avoids a system OpenSSL.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio = { version = "1", features = ["net", "time", "io-util", "macros", "rt-multi-thread", "sync"] }
+url = "2"
+sha2 = "0.10"
+base64 = "0.22"
+rand = "0.8"
+
+# OS keychain: Windows Credential Manager, macOS Keychain, Linux Secret
+# Service. The only place a token is ever written; there is no file fallback.
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service"] }
+
+[dev-dependencies]
+tiny_http = "0.12"
