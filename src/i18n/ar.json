@@ -54,5 +54,10 @@
   "chat.send": "إرسال",
   "chat.stop": "إيقاف",
   "chat.you": "أنت",
-  "chat.usedTool": "استخدم"
+  "chat.usedTool": "استخدم",
+  "connections.agent": "وكيل",
+  "connections.grantedAgents": "الوكلاء الذين منحتهم الصلاحية في {workspace}",
+  "connections.useAgent": "سجّل الدخول بهذا الوكيل",
+  "tools.connectAs": "الاتصال باسم",
+  "chat.asAgent": "{agent} (وكيل)"
 }

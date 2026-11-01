@@ -44,6 +44,37 @@ async fn sign_in(
         .await
 }
 
+/// The agents the person granted in a workspace. Nothing for an agent's own sign-in.
+#[tauri::command]
+async fn list_granted_agents(
+    connections: tauri::State<'_, Connections>,
+    connection: String,
+    language: String,
+) -> Result<Vec<bridge::GrantedAgent>, String> {
+    let (_, resource, _) = connections
+        .workspace(&connection)
+        .ok_or("not signed in to that workspace")?;
+    let language = if language == "ar" { "ar" } else { "en" };
+    bridge::granted_agents(&connections, &connection, &resource, language).await
+}
+
+/// Sign in as one of the workspace's agents, in the browser.
+#[tauri::command]
+async fn sign_in_agent(
+    app: tauri::AppHandle,
+    connections: tauri::State<'_, Connections>,
+    connection: String,
+    slug: String,
+) -> Result<ConnectionView, String> {
+    connections
+        .sign_in_agent(&connection, &slug, |url| {
+            app.opener()
+                .open_url(url.as_str(), None::<&str>)
+                .map_err(|e| e.to_string())
+        })
+        .await
+}
+
 #[tauri::command]
 fn sign_out(connections: tauri::State<'_, Connections>, id: String) -> Result<(), String> {
     connections.update_state(|state| state.links.retain(|l| l.connection != id))?;
@@ -331,6 +362,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_connections,
+            list_granted_agents,
+            sign_in_agent,
             list_engines,
             send_chat,
             stop_chat,

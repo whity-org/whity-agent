@@ -54,5 +54,10 @@
   "chat.send": "Send",
   "chat.stop": "Stop",
   "chat.you": "You",
-  "chat.usedTool": "Used"
+  "chat.usedTool": "Used",
+  "connections.agent": "Agent",
+  "connections.grantedAgents": "Agents you've granted in {workspace}",
+  "connections.useAgent": "Sign in as this agent",
+  "tools.connectAs": "Connect as",
+  "chat.asAgent": "{agent} (agent)"
 }

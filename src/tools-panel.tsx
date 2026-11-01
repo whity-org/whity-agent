@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
+  connectionName,
   connectTool,
   disconnectTool,
   listTools,
@@ -10,6 +11,7 @@ import {
   type Tool,
 } from "./api"
 import { Button } from "@whity/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@whity/ui/select"
 import { useI18n } from "./i18n"
 
 interface Review {
@@ -38,7 +40,7 @@ export function ToolsPanel({ connections }: { connections: Connection[] }) {
 
   const workspaceName = (id: string) => {
     const c = connections.find((c) => c.id === id)
-    return c === undefined ? id : (c.name ?? new URL(c.resource).host)
+    return c === undefined ? id : connectionName(c)
   }
 
   const act = async (work: () => Promise<unknown>) => {
@@ -68,7 +70,8 @@ export function ToolsPanel({ connections }: { connections: Connection[] }) {
     }
   }
   const installed = tools.filter((tool) => tool.installed)
-  const first = connections[0]
+  const [chosen, setChosen] = useState<string | null>(null)
+  const target = connections.find((c) => c.id === chosen) ?? connections[0]
 
   return (
     <section className="flex flex-col gap-3">
@@ -76,6 +79,23 @@ export function ToolsPanel({ connections }: { connections: Connection[] }) {
       <p className="text-muted-foreground">{t("tools.intro")}</p>
       {connections.length === 0 && <p className="text-muted-foreground">{t("tools.signInFirst")}</p>}
       {installed.length === 0 && <p className="text-muted-foreground">{t("tools.none")}</p>}
+      {installed.length > 0 && connections.length > 1 && target !== undefined && (
+        <label className="flex items-center gap-2 font-medium">
+          {t("tools.connectAs")}
+          <Select value={target.id} onValueChange={setChosen}>
+            <SelectTrigger aria-label={t("tools.connectAs")} className="min-w-0 flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {connections.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.agent === null ? connectionName(c) : t("chat.asAgent", { agent: connectionName(c) })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
+      )}
 
       <ul className="flex flex-col gap-2">
         {installed.map((tool) => (
@@ -87,8 +107,8 @@ export function ToolsPanel({ connections }: { connections: Connection[] }) {
                   {tool.method === "bridge" ? t("tools.viaBridge") : t("tools.signsInItself")}
                 </span>
               </div>
-              {first !== undefined && !tool.connections.includes(first.id) && (
-                <Button variant="outline" disabled={busy} onClick={() => openReview(tool, first)}>
+              {target !== undefined && !tool.connections.includes(target.id) && (
+                <Button variant="outline" disabled={busy} onClick={() => openReview(tool, target)}>
                   {t("tools.connect")}
                 </Button>
               )}

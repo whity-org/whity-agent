@@ -69,6 +69,7 @@ pub struct ConnectionView {
     pub name: Option<String>,
     pub issuer: String,
     pub persisted: bool,
+    pub agent: Option<String>,
 }
 
 pub struct Connections {
@@ -124,7 +125,47 @@ impl Connections {
         F: FnOnce(&Url) -> Result<(), String>,
     {
         let origin = oauth::normalize_address(address)?;
-        let discovery = oauth::discover(&self.http, &origin).await?;
+        self.sign_in_to(&origin, "mcp", None, open).await
+    }
+
+    /// Sign in again as one of the workspace's agents, which is its own resource
+    /// with its own token and grant. The person's own sign-in stays as it is.
+    pub async fn sign_in_agent<F>(
+        &self,
+        connection: &str,
+        slug: &str,
+        open: F,
+    ) -> Result<ConnectionView, String>
+    where
+        F: FnOnce(&Url) -> Result<(), String>,
+    {
+        if !oauth::is_agent_slug(slug) {
+            return Err("that isn't an agent's name".into());
+        }
+        let resource = self
+            .list()
+            .into_iter()
+            .find(|c| c.id == connection && c.agent.is_none())
+            .ok_or("not signed in to that workspace")?
+            .resource;
+        let origin = Url::parse(&resource)
+            .and_then(|u| u.join("/"))
+            .map_err(|e| e.to_string())?;
+        self.sign_in_to(&origin, &format!("mcp/agents/{slug}"), Some(slug), open)
+            .await
+    }
+
+    async fn sign_in_to<F>(
+        &self,
+        origin: &Url,
+        path: &str,
+        agent: Option<&str>,
+        open: F,
+    ) -> Result<ConnectionView, String>
+    where
+        F: FnOnce(&Url) -> Result<(), String>,
+    {
+        let discovery = oauth::discover(&self.http, origin, path).await?;
         let client_id = self.client_id_for(&discovery).await?;
 
         let pkce = Pkce::new();
@@ -170,6 +211,7 @@ impl Connections {
             issuer: discovery.issuer.clone(),
             token_endpoint: discovery.token_endpoint.clone(),
             client_id,
+            agent: agent.map(str::to_string),
         };
         let persisted = match tokens.refresh_token.as_deref() {
             Some(refresh) => self
@@ -211,16 +253,20 @@ impl Connections {
         Ok(result)
     }
 
-    /// The host and MCP URL of a signed-in workspace, and whether its sign-in
-    /// is kept in the keychain. Tools name the server after the host, which,
-    /// unlike the workspace's own name, is unique.
+    /// What to name a signed-in workspace in a tool, its MCP URL, and whether its
+    /// sign-in is kept in the keychain. Tools name the server after the host,
+    /// which, unlike the workspace's own name, is unique, and the agent if any.
     pub fn workspace(&self, id: &str) -> Option<(String, String, bool)> {
         self.list().into_iter().find(|c| c.id == id).map(|c| {
             let host = url::Url::parse(&c.resource)
                 .ok()
                 .and_then(|u| u.host_str().map(str::to_string))
                 .unwrap_or_default();
-            (host, c.resource, c.persisted)
+            let name = match c.agent {
+                Some(agent) => format!("{host} {agent}"),
+                None => host,
+            };
+            (name, c.resource, c.persisted)
         })
     }
 
@@ -330,6 +376,7 @@ fn view(connection: &Connection, persisted: bool) -> ConnectionView {
         name: connection.name.clone(),
         issuer: connection.issuer.clone(),
         persisted,
+        agent: connection.agent.clone(),
     }
 }
 
@@ -363,6 +410,18 @@ mod tests {
                 let _ = request.as_reader().read_to_string(&mut body);
                 let url = request.url().to_string();
                 let json = match url.as_str() {
+                    "/.well-known/oauth-protected-resource/mcp/agents/finance-clerk" => {
+                        serde_json::json!({
+                            "resource": format!("{o}/mcp/agents/finance-clerk"),
+                            "authorization_servers": [o.clone()],
+                            "scopes_supported": ["tools:call"],
+                            "resource_name": "Finance clerk",
+                        })
+                    }
+                    "/.well-known/oauth-protected-resource/mcp/agents/lying" => serde_json::json!({
+                        "resource": format!("{o}/mcp"),
+                        "authorization_servers": [o.clone()],
+                    }),
                     "/.well-known/oauth-protected-resource/mcp" => serde_json::json!({
                         "resource": format!("{o}/mcp"),
                         "authorization_servers": [o.clone()],
@@ -531,6 +590,66 @@ mod tests {
         let lock = RefreshLock::acquire(&dir).await.unwrap();
         drop(lock);
         assert!(!dir.join("refresh.lock").exists(), "released when dropped");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_agent_is_its_own_sign_in_beside_the_persons() {
+        let server = mock(Some("rt-1"));
+        let (agent, dir) = connections(MemoryStore::default());
+        let person = agent
+            .sign_in(&server.origin, browser(server.origin.clone()))
+            .await
+            .unwrap();
+
+        let clerk = agent
+            .sign_in_agent(&person.id, "finance-clerk", browser(server.origin.clone()))
+            .await
+            .unwrap();
+
+        assert_ne!(clerk.id, person.id);
+        assert_eq!(clerk.agent.as_deref(), Some("finance-clerk"));
+        assert_eq!(
+            clerk.resource,
+            format!("{}/mcp/agents/finance-clerk", server.origin)
+        );
+        assert_eq!(agent.list().len(), 2);
+        let (_, form) = server.posts.lock().unwrap().last().cloned().unwrap();
+        assert!(form.contains("mcp%2Fagents%2Ffinance-clerk"), "{form}");
+        // Tools get a name of its own for it.
+        let (name, _, _) = agent.workspace(&clerk.id).unwrap();
+        assert!(name.ends_with(" finance-clerk"), "{name}");
+        // An agent can't be the way in to another agent.
+        assert!(agent
+            .sign_in_agent(&clerk.id, "finance-clerk", browser(server.origin.clone()))
+            .await
+            .is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_agent_sign_in_refuses_a_bad_name_or_another_resource() {
+        let server = mock(Some("rt-1"));
+        let (agent, dir) = connections(MemoryStore::default());
+        let person = agent
+            .sign_in(&server.origin, browser(server.origin.clone()))
+            .await
+            .unwrap();
+
+        for bad in ["../mcp", "Finance", "", "-x", "a/b"] {
+            assert!(
+                agent
+                    .sign_in_agent(&person.id, bad, |_| Ok(()))
+                    .await
+                    .is_err(),
+                "{bad}"
+            );
+        }
+        let error = agent
+            .sign_in_agent(&person.id, "lying", |_| Ok(()))
+            .await
+            .unwrap_err();
+        assert!(error.contains("another resource"), "{error}");
         std::fs::remove_dir_all(dir).unwrap();
     }
 
