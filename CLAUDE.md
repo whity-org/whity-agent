@@ -6,5 +6,5 @@
 - Never write a bearer token into another tool's config file. A tool either signs in itself (URL only) or uses the stdio bridge.
 - Every config edit to another tool: show the diff, ask, back up, write atomically, and keep a way back.
 - Every visible string has English and Arabic (`src/i18n`); use logical CSS properties; numbers and addresses stay left to right.
-- Design tokens only (`src/vendor/whity-tokens`), never raw colours or Tailwind palette classes. Noto Sans; no font weight 700. One filled main button per view.
+- Design tokens only (`@whity/tokens`), components from `@whity/ui`, never raw colours or Tailwind palette classes. Noto Sans; no font weight 700. One filled main button per view.
 - Every PR adds a `changelog.d` fragment, and its title starts with its WHIT ID.

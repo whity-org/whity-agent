@@ -9,7 +9,7 @@ import {
   type Proposal,
   type Tool,
 } from "./api"
-import { Button } from "./components/button"
+import { Button } from "@whity/ui/button"
 import { useI18n } from "./i18n"
 
 interface Review {
@@ -88,7 +88,7 @@ export function ToolsPanel({ connections }: { connections: Connection[] }) {
                 </span>
               </div>
               {first !== undefined && !tool.connections.includes(first.id) && (
-                <Button disabled={busy} onClick={() => openReview(tool, first)}>
+                <Button variant="outline" disabled={busy} onClick={() => openReview(tool, first)}>
                   {t("tools.connect")}
                 </Button>
               )}
@@ -98,11 +98,11 @@ export function ToolsPanel({ connections }: { connections: Connection[] }) {
                 <span>{t("tools.connectedTo", { workspace: workspaceName(id) })}</span>
                 <span className="flex gap-2">
                   {tool.method !== "command" && (
-                    <Button disabled={busy} onClick={() => act(() => restoreTool(tool.id, id))}>
+                    <Button variant="outline" disabled={busy} onClick={() => act(() => restoreTool(tool.id, id))}>
                       {t("tools.restore")}
                     </Button>
                   )}
-                  <Button disabled={busy} onClick={() => act(() => disconnectTool(tool.id, id))}>
+                  <Button variant="outline" disabled={busy} onClick={() => act(() => disconnectTool(tool.id, id))}>
                     {t("tools.disconnect")}
                   </Button>
                 </span>
@@ -194,10 +194,10 @@ function ReviewSheet({
       {proposal.kind === "nothing" && <p>{t("review.nothing", { tool: tool.name })}</p>}
 
       <div className="flex gap-2 pt-1">
-        <Button variant="main" disabled={busy} onClick={onConfirm}>
+        <Button disabled={busy} onClick={onConfirm}>
           {t("review.confirm")}
         </Button>
-        <Button disabled={busy} onClick={onCancel}>
+        <Button variant="outline" disabled={busy} onClick={onCancel}>
           {t("review.cancel")}
         </Button>
       </div>

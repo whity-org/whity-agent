@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { listConnections, signIn, signOut, type Connection, type SignInError } from "./api"
-import { Button } from "./components/button"
+import { Button } from "@whity/ui/button"
 import { useI18n, type MessageKey } from "./i18n"
 import { ToolsPanel } from "./tools-panel"
 
@@ -58,7 +58,7 @@ export function App() {
     <main className="mx-auto flex min-h-full max-w-xl flex-col gap-6 bg-background px-6 py-8 text-foreground">
       <header className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">{t("app.title")}</h1>
-        <Button onClick={toggle}>{t("app.language")}</Button>
+        <Button variant="outline" onClick={toggle}>{t("app.language")}</Button>
       </header>
 
       <section className="flex flex-col gap-3">
@@ -81,7 +81,7 @@ export function App() {
                     {t(c.persisted ? "connections.kept" : "connections.sessionOnly")}
                   </span>
                 </div>
-                <Button onClick={() => remove(c.id)}>{t("connections.signOut")}</Button>
+                <Button variant="outline" onClick={() => remove(c.id)}>{t("connections.signOut")}</Button>
               </li>
             ))}
           </ul>
@@ -107,7 +107,7 @@ export function App() {
           </p>
         )}
         <div className="pt-1">
-          <Button variant="main" type="submit" disabled={busy || address.trim() === ""}>
+          <Button type="submit" disabled={busy || address.trim() === ""}>
             {busy ? t("connections.signingIn") : t("connections.signIn")}
           </Button>
         </div>
