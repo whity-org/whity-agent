@@ -23,3 +23,32 @@ export type SignInError = "invalid_address" | "no_sign_in" | "cancelled" | "time
 export const listConnections = () => invoke<Connection[]>("list_connections")
 export const signIn = (address: string) => invoke<Connection>("sign_in", { address })
 export const signOut = (id: string) => invoke<void>("sign_out", { id })
+
+/** How a tool is connected: its own add command, a URL-only config entry, or (later) the bridge. */
+export type Method = "command" | "file" | "bridge"
+
+export interface Tool {
+  id: string
+  name: string
+  method: Method
+  /** Where its executable was found on PATH. */
+  binary: string | null
+  config: string | null
+  installed: boolean
+  /** Ids of the workspaces whity-agent connected it to. */
+  connections: string[]
+}
+
+/** What connecting will do, shown to the person before anything happens. */
+export type Proposal =
+  | { kind: "command"; argv: string[]; server: string }
+  | { kind: "file"; server: string; plan: { path: string; before: string; after: string; beforeHash: string } }
+  | { kind: "nothing"; server: string }
+  | { kind: "needsBridge" }
+
+export const listTools = () => invoke<Tool[]>("list_tools")
+export const planConnect = (tool: string, connection: string) => invoke<Proposal>("plan_connect", { tool, connection })
+export const connectTool = (tool: string, connection: string, approvedHash: string | null) =>
+  invoke<void>("connect_tool", { tool, connection, approvedHash })
+export const disconnectTool = (tool: string, connection: string) => invoke<void>("disconnect_tool", { tool, connection })
+export const restoreTool = (tool: string, connection: string) => invoke<void>("restore_tool", { tool, connection })

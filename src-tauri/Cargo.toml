@@ -20,11 +20,11 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 # HTTP to the workspace and its authorization server, from Rust only, so no
 # token ever enters the webview. rustls avoids a system OpenSSL.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-tokio = { version = "1", features = ["net", "time", "io-util", "macros", "rt-multi-thread", "sync"] }
+tokio = { version = "1", features = ["net", "time", "io-util", "macros", "rt-multi-thread", "sync", "process"] }
 url = "2"
 sha2 = "0.10"
 base64 = "0.22"
