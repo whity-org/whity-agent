@@ -11,6 +11,7 @@ mod loopback;
 mod oauth;
 mod store;
 mod tools;
+mod updates;
 
 use chat::{BridgeCommand, ChatEvent, Engine};
 use connections::{ConnectionView, Connections};
@@ -178,6 +179,29 @@ fn restore_tool(
     })
 }
 
+/// The path a tool's config can run this app by. An AppImage runs from a temporary
+/// mount that's gone next time, and says where the real file is in `APPIMAGE`.
+fn own_executable() -> Option<PathBuf> {
+    std::env::var_os("APPIMAGE")
+        .map(PathBuf::from)
+        .or_else(|| std::env::current_exe().ok())
+}
+
+/// See [`tools::with_usual_dirs`]. Windows apps get the full PATH already.
+fn add_usual_dirs_to_path() {
+    if cfg!(windows) {
+        return;
+    }
+    let path = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect())
+        .unwrap_or_default();
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    if let Ok(joined) = std::env::join_paths(tools::with_usual_dirs(path, home.as_deref())) {
+        // During setup, before the app starts any thread of its own that reads it.
+        std::env::set_var("PATH", joined);
+    }
+}
+
 /// The chat's running turn and conversations. Engine session ids stay here: the
 /// webview never sees them or chooses which to resume.
 struct ChatState {
@@ -270,6 +294,23 @@ async fn send_chat(
     result
 }
 
+/// Look for a newer version and download it, returning its version when it's ready.
+#[tauri::command]
+async fn check_for_update(
+    app: tauri::AppHandle,
+    pending: tauri::State<'_, updates::PendingUpdate>,
+) -> Result<Option<String>, String> {
+    updates::check(&app, &pending).await
+}
+
+#[tauri::command]
+fn install_update(
+    app: tauri::AppHandle,
+    pending: tauri::State<'_, updates::PendingUpdate>,
+) -> Result<(), String> {
+    updates::install(&app, &pending)
+}
+
 #[tauri::command]
 fn stop_chat(chat: tauri::State<'_, ChatState>) {
     if let Some(stop) = chat.running.lock().unwrap().take() {
@@ -344,14 +385,17 @@ pub fn run_bridge(args: &[String]) -> i32 {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updates::PendingUpdate::default())
         .setup(|app| {
+            add_usual_dirs_to_path();
             let dir = app.path().app_config_dir()?;
             app.manage(Connections::new(StateFile::new(&dir), Box::new(OsKeychain)));
             app.manage(Linker {
                 env: tools::Environment::current(),
                 backups: app.path().app_data_dir()?.join("backups"),
                 command_timeout: Duration::from_secs(60),
-                executable: std::env::current_exe().ok(),
+                executable: own_executable(),
             });
             app.manage(ChatState {
                 dir: app.path().app_data_dir()?.join("chat"),
@@ -365,6 +409,8 @@ pub fn run() {
             list_granted_agents,
             sign_in_agent,
             list_engines,
+            check_for_update,
+            install_update,
             send_chat,
             stop_chat,
             new_chat,

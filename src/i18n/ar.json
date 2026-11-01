@@ -59,5 +59,8 @@
   "connections.grantedAgents": "الوكلاء الذين منحتهم الصلاحية في {workspace}",
   "connections.useAgent": "سجّل الدخول بهذا الوكيل",
   "tools.connectAs": "الاتصال باسم",
-  "chat.asAgent": "{agent} (وكيل)"
+  "chat.asAgent": "{agent} (وكيل)",
+  "update.ready": "التحديث جاهز:",
+  "update.restart": "أعد التشغيل للتحديث",
+  "update.failed": "تعذّر تثبيته. سيحاول مرة أخرى لاحقًا."
 }
