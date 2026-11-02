@@ -1,6 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react"
+import { listen } from "@tauri-apps/api/event"
+import { Checkbox } from "@whity/ui/checkbox"
 import {
   connectionName,
+  getStartAtLogin,
+  setStartAtLogin,
+  setTrayLabels,
+  takeConnectLink,
   listConnections,
   listGrantedAgents,
   signIn,
@@ -41,6 +47,25 @@ export function App() {
   useEffect(() => {
     listConnections().then(setConnections, (e: unknown) => setError(String(e)))
   }, [])
+
+  // A link only fills in the address: signing in stays the person's own step.
+  useEffect(() => {
+    takeConnectLink().then((address) => address !== null && setAddress(address), () => undefined)
+    const stop = listen<string>("connect-link", (event) => setAddress(event.payload))
+    return () => void stop.then((unlisten) => unlisten(), () => undefined)
+  }, [])
+
+  useEffect(() => {
+    setTrayLabels(t("tray.open"), t("tray.quit")).catch(() => undefined)
+  }, [t])
+
+  const [startAtLogin, setStartAtLoginState] = useState<boolean | null>(null)
+  useEffect(() => {
+    getStartAtLogin().then(setStartAtLoginState, () => setStartAtLoginState(null))
+  }, [])
+  const changeStartAtLogin = (on: boolean) => {
+    setStartAtLogin(on).then(() => setStartAtLoginState(on), (e: unknown) => setError(String(e)))
+  }
 
   const describe = (e: unknown): string => {
     const code = String(e)
@@ -155,6 +180,13 @@ export function App() {
       </form>
 
       <ToolsPanel connections={connections} />
+
+      {startAtLogin !== null && (
+        <label className="flex items-center gap-2">
+          <Checkbox checked={startAtLogin} onCheckedChange={(on) => changeStartAtLogin(on === true)} />
+          {t("settings.startAtLogin")}
+        </label>
+      )}
         </TabsContent>
       </Tabs>
     </main>

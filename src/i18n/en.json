@@ -62,5 +62,8 @@
   "chat.asAgent": "{agent} (agent)",
   "update.ready": "An update is ready:",
   "update.restart": "Restart to update",
-  "update.failed": "It couldn't be installed. It will try again later."
+  "update.failed": "It couldn't be installed. It will try again later.",
+  "tray.open": "Open Whity Agent",
+  "tray.quit": "Quit",
+  "settings.startAtLogin": "Start Whity Agent when you sign in to this computer"
 }

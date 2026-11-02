@@ -62,5 +62,8 @@
   "chat.asAgent": "{agent} (وكيل)",
   "update.ready": "التحديث جاهز:",
   "update.restart": "أعد التشغيل للتحديث",
-  "update.failed": "تعذّر تثبيته. سيحاول مرة أخرى لاحقًا."
+  "update.failed": "تعذّر تثبيته. سيحاول مرة أخرى لاحقًا.",
+  "tray.open": "فتح وكيل Whity",
+  "tray.quit": "إنهاء",
+  "settings.startAtLogin": "شغّل وكيل Whity عند تسجيل دخولك إلى هذا الجهاز"
 }

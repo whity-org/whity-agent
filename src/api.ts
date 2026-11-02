@@ -90,3 +90,9 @@ export const connectionName = (connection: Connection) => connection.name ?? new
 /** Downloads a newer version if there is one, and answers its version when it's ready. */
 export const checkForUpdate = () => invoke<string | null>("check_for_update")
 export const installUpdate = () => invoke<void>("install_update")
+
+/** A workspace address a `whity-agent://` link brought. It only fills in the form. */
+export const takeConnectLink = () => invoke<string | null>("take_connect_link")
+export const setTrayLabels = (open: string, quit: string) => invoke<void>("set_tray_labels", { open, quit })
+export const getStartAtLogin = () => invoke<boolean>("get_start_at_login")
+export const setStartAtLogin = (enabled: boolean) => invoke<void>("set_start_at_login", { enabled })
