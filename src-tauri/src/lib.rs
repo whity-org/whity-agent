@@ -6,6 +6,7 @@ mod bridge;
 mod chat;
 mod config_writer;
 mod connections;
+mod desktop;
 mod linking;
 mod loopback;
 mod oauth;
@@ -22,7 +23,9 @@ use std::sync::Mutex;
 use std::time::Duration;
 use store::{OsKeychain, StateFile};
 use tauri::ipc::Channel;
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
+use tauri_plugin_autostart::ManagerExt as _;
+use tauri_plugin_deep_link::DeepLinkExt as _;
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
@@ -324,6 +327,34 @@ fn new_chat(chat: tauri::State<'_, ChatState>) {
     chat.sessions.lock().unwrap().clear();
 }
 
+/// A workspace address a `whity-agent://` link brought, once.
+#[tauri::command]
+fn take_connect_link(pending: tauri::State<'_, desktop::PendingLink>) -> Option<String> {
+    pending.0.lock().unwrap().take()
+}
+
+/// The tray's words, in the language the person chose.
+#[tauri::command]
+fn set_tray_labels(app: tauri::AppHandle, open: String, quit: String) -> Result<(), String> {
+    desktop::set_tray_labels(&app, &open, &quit)
+}
+
+#[tauri::command]
+fn get_start_at_login(app: tauri::AppHandle) -> Result<bool, String> {
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_start_at_login(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let autostart = app.autolaunch();
+    if enabled {
+        autostart.enable()
+    } else {
+        autostart.disable()
+    }
+    .map_err(|e| e.to_string())
+}
+
 /// The workspace's approvals, in the browser: the desktop isn't a second inbox.
 #[tauri::command]
 fn open_approvals(
@@ -384,11 +415,44 @@ pub fn run_bridge(args: &[String]) -> i32 {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // First, as the plugin asks: a second start only hands over its links.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            desktop::show_window(app);
+            desktop::handle_links(app, args.iter().map(String::as_str));
+        }))
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![desktop::HIDDEN_ARG]),
+        ))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updates::PendingUpdate::default())
+        .manage(desktop::PendingLink::default())
+        // Closing the window keeps the app in the tray; Quit there ends it.
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
         .setup(|app| {
             add_usual_dirs_to_path();
+            desktop::create_tray(app)?;
+            let handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                let links: Vec<String> = event.urls().iter().map(|u| u.to_string()).collect();
+                desktop::handle_links(&handle, links.iter().map(String::as_str));
+            });
+            // Windows and Linux deliver a link to a fresh start as an argument.
+            // The installers register the scheme, except for an AppImage.
+            #[cfg(target_os = "linux")]
+            let _ = app.deep_link().register_all();
+            let args: Vec<String> = std::env::args().skip(1).collect();
+            desktop::handle_links(app.handle(), args.iter().map(String::as_str));
+            if !args.iter().any(|a| a == desktop::HIDDEN_ARG) {
+                desktop::show_window(app.handle());
+            }
             let dir = app.path().app_config_dir()?;
             app.manage(Connections::new(StateFile::new(&dir), Box::new(OsKeychain)));
             app.manage(Linker {
@@ -409,6 +473,10 @@ pub fn run() {
             list_granted_agents,
             sign_in_agent,
             list_engines,
+            take_connect_link,
+            set_tray_labels,
+            get_start_at_login,
+            set_start_at_login,
             check_for_update,
             install_update,
             send_chat,
