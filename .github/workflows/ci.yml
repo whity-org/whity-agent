@@ -54,12 +54,17 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
+  # The fragments are checked with whity-core's changelog tool, the one copy
+  # for every Whity repository, through whity-org/.github (WHIT-1057). A job
+  # that calls a shared workflow reports as "<job> / <name>", so the gate below
+  # keeps the check name branch protection requires.
   changelog:
+    uses: whity-org/.github/.github/workflows/changelog-fragment.yml@main
+
+  changelog-gate:
     name: Changelog fragments
+    needs: changelog
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "22"
-      - run: npm run changelog:check
+      - run: test "${{ needs.changelog.result }}" = success

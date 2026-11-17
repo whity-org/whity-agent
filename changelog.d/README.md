@@ -18,5 +18,11 @@ convention as whity-core and whity-id.
 One or more list items, written for the person reading the release page: what
 changed and why it matters. No headings; the section comes from the file name.
 
-CI runs `npm run changelog:check` on every PR, so a misnamed or empty fragment
-fails there.
+CI checks the fragments on every PR with whity-core's changelog tool, the one
+copy for every Whity repository (whity-org/.github's `changelog-fragment.yml`),
+so a misnamed or empty fragment fails there. To check them yourself, from the
+repository root (needs PHP 8.4):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/whity-org/.github/main/changelog/assemble.sh | sh -s -- --check
+```

@@ -10,8 +10,7 @@
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "tauri": "tauri",
-    "changelog:check": "node scripts/changelog-check.mjs"
+    "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

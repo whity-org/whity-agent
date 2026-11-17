@@ -34,8 +34,10 @@ Checks, as CI runs them:
 ```bash
 npm run typecheck && npm test
 cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
-npm run changelog:check
 ```
+
+CI also checks the `changelog.d` fragments with whity-core's changelog tool (see
+`changelog.d/README.md`).
 
 ## Design tokens
 
